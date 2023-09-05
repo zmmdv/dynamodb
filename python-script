@@ -1,0 +1,70 @@
+import json
+import math
+import os
+import shutil
+
+source_file = 'NAME_OF_JSON_YOU_PROVIDED'
+mutated_file = 'NEW_NAME_PREFIX_FOR_FILES'
+table_name = 'TABLE_NAME_IN_DYNAMODB'
+obj_limit = -1
+remove_existing_dir = True
+
+records_per_file = 25
+records_dir = "./dynamodb_data_dir"
+
+
+def write_to_file(f_name, data):
+    data_to_write = {table_name: []}
+    for i in data:
+        data_to_write[table_name].append({"PutRequest": {"Item": i}})
+
+    os.makedirs(records_dir, exist_ok=True)
+
+    with open(os.path.join(records_dir, f_name), "w+") as f:
+        f.write(json.dumps(data_to_write, indent=4, separators=(",", ": ")))
+
+
+def read_data():
+    res = []
+    c = 1
+    with open(source_file, "r+") as f:
+        j = json.loads(f.read())
+    for item in j['Items']:
+        if 0 < obj_limit == c:
+            return res
+
+        res.append(item)
+        c += 1
+
+    return res
+
+
+def main():
+
+    if 0 < obj_limit < records_per_file:
+        print("Error")
+        exit(1)
+
+    if remove_existing_dir:
+        shutil.rmtree(records_dir, ignore_errors=True)
+
+    d = read_data()
+
+    iterations = len(d) // records_per_file if len(d) % records_per_file > 0 else len(d) // records_per_file
+
+    start_index = 0
+    end_index = 0
+
+    for i in range(0, iterations + 1):
+        if i == 0:
+            end_index = records_per_file
+        else:
+            i = i + 1
+            end_index = records_per_file * i if records_per_file * i < len(d) else len(d) % records_per_file + end_index
+
+        write_to_file(f"new_data_{i}.json", d[start_index:end_index])
+        start_index = end_index
+
+
+if __name__ == '__main__':
+    main()
